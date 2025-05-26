@@ -1,0 +1,62 @@
+body {
+  display: flex;
+  justify-content: center; /* căn giữa theo chiều ngang */
+  align-items: center;      /* căn giữa theo chiều dọc */
+  width: 100vw;   /* hoặc 100% nếu nằm trong thẻ html */
+  height: 100vh;  /* chiều cao bằng chiều cao khung trình duyệt */
+  background: #f0f0f0;
+}
+
+
+.screen{
+  width: 50em;
+  height: 25em;
+  display: flex;
+  background: #b12d2d;
+  border-radius: 10px;
+  transform: translate(8em, -5em); /* x: phải 5em, y: xuống 10em */
+  border:0.5em solid black;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* hoặc object-fit: contain nếu bạn không muốn crop */
+  display: block;
+}
+
+.arrow-div {
+  display: flex;
+  gap: 10px;
+  transform: translate(-5em, 9em); /* x: phải 5em, y: xuống 10em */
+}
+
+.arrow {
+  width: 0;
+  height: 0;
+  border-top: 30px solid transparent;
+  border-bottom: 30px solid transparent;
+  border-left: 45px solid red;
+  border-radius: 10px;
+}
+
+.arrow.up {
+  transform: translate(10.8em, 1.5em) rotate(-90deg);
+}
+
+.arrow.down {
+  transform: translate(7.5em, 8.5em) rotate(90deg);
+  /* transform: translate(20em, 10em); x: phải 5em, y: xuống 10em */
+
+}
+
+.arrow.left {
+  transform: translate(0.5em, 5em) rotate(180deg);
+  /* transform: translate(20em, 10em); x: phải 5em, y: xuống 10em */
+
+}
+
+.arrow.right {
+  transform: translate(4em, 5em);
+}
+
