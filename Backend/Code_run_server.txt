@@ -1,0 +1,2 @@
+python mjpeg_server.py
+uvicorn main:app --reload --port 8000
