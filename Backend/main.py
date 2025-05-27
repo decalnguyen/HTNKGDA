@@ -3,8 +3,25 @@ from fastapi.responses import StreamingResponse
 import cv2
 import numpy as np
 import asyncio
+import torch
+import torchvision.transforms as T
+from ultralytics import YOLO
 
 app = FastAPI()
+
+# === 🧠 Load mô hình YOLO đã huấn luyện ===
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = YOLO("my_model.pt").to(device)
+model.eval()
+
+FIRE_CLASSES = ['fire']  # Đảm bảo tên lớp trùng với model.names
+
+# Chuẩn hóa ảnh đầu vào
+transform = T.Compose([
+    T.ToPILImage(),
+    T.Resize((320, 320)),
+    T.ToTensor(),
+])
 
 latest_frame = None
 frame_count = 0
@@ -27,33 +44,53 @@ async def websocket_endpoint(websocket: WebSocket):
                 print(f"❌ Không thể chuyển đổi frame {frame_count}: {e}")
                 continue
 
-            img = cv2.resize(img, (800, 400))
+            # Resize ảnh cho model
+            img_for_model = cv2.resize(img, (320, 320))
+            input_tensor = transform(img_for_model).unsqueeze(0).to(device)
 
-            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            lower = np.array([10, 100, 100])
-            upper = np.array([25, 255, 255])
-            mask = cv2.inRange(hsv, lower, upper)
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # Ảnh để hiển thị (scale lớn)
+            display_img = cv2.resize(img, (320, 320))
+
+            # Tính tỉ lệ scale để vẽ bounding box
+            scale_x = display_img.shape[1] / 320
+            scale_y = display_img.shape[0] / 320
+
+            with torch.no_grad():
+                results = model(input_tensor)[0]
+                boxes = results.boxes
 
             fire_detected = False
-            for cnt in contours:
-                area = cv2.contourArea(cnt)
-                if area > 500:
-                    x, y, w, h = cv2.boundingRect(cnt)
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                label = model.names[cls_id]
+
+                if label in FIRE_CLASSES:
+                    # Scale lại vị trí khung để vẽ trên ảnh lớn
+                    x1 = int(x1 * scale_x)
+                    y1 = int(y1 * scale_y)
+                    x2 = int(x2 * scale_x)
+                    y2 = int(y2 * scale_y)
+
+                    cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    cv2.putText(display_img, f"{label} {conf:.2f}", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                     fire_detected = True
 
             if fire_detected:
-                cv2.putText(img, "🔥 FIRE DETECTED!", (10, 40),
+                cv2.putText(display_img, "🔥 FIRE DETECTED (YOLOv11)", (10, 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             else:
-                cv2.putText(img, "No fire", (10, 40),
+                cv2.putText(display_img, "No fire", (10, 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-            latest_frame = img
+            latest_frame = display_img
 
     except WebSocketDisconnect:
         print("🔴 WebSocket disconnected")
+
 
 async def mjpeg_generator():
     global latest_frame
@@ -61,18 +98,17 @@ async def mjpeg_generator():
         if latest_frame is not None:
             ret, jpeg = cv2.imencode(".jpg", latest_frame)
             if ret:
-                frame = (b"--frame\r\n"
-                         b"Content-Type: image/jpeg\r\n\r\n" +
-                         jpeg.tobytes() + b"\r\n")
-                yield frame
+                yield (b"--frame\r\n"
+                       b"Content-Type: image/jpeg\r\n\r\n" +
+                       jpeg.tobytes() + b"\r\n")
         else:
-            blank = np.zeros((400, 800, 3), dtype=np.uint8)
+            blank = np.zeros((320, 320, 3), dtype=np.uint8)
             _, jpeg = cv2.imencode(".jpg", blank)
-            frame = (b"--frame\r\n"
-                     b"Content-Type: image/jpeg\r\n\r\n" +
-                     jpeg.tobytes() + b"\r\n")
-            yield frame
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" +
+                   jpeg.tobytes() + b"\r\n")
         await asyncio.sleep(0.05)
+
 
 @app.get("/video")
 async def video_stream():

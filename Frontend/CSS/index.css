@@ -1,21 +1,25 @@
 body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
   display: flex;
-  justify-content: center; /* căn giữa theo chiều ngang */
-  align-items: center;      /* căn giữa theo chiều dọc */
-  width: 100vw;   /* hoặc 100% nếu nằm trong thẻ html */
-  height: 100vh;  /* chiều cao bằng chiều cao khung trình duyệt */
-  background: #f0f0f0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  /* overflow: hidden; Ngăn cuộn */
 }
 
 
-.screen{
-  width: 50em;
-  height: 25em;
-  display: flex;
+
+.screen {
+  width: 320px;
+  height: 320px;
   background: #b12d2d;
   border-radius: 10px;
-  transform: translate(8em, -5em); /* x: phải 5em, y: xuống 10em */
-  border:0.5em solid black;
+  border: 0.5em solid black;
+  display: flex;
 }
 
 #video {
@@ -25,11 +29,11 @@ body {
   display: block;
 }
 
-.button-div{
-  display: flex;
-  gap: 10px;
-  transform: translate(-10em, 12em); /* x: phải 5em, y: xuống 10em */
+.button-div {
+  margin-top: 1em;
+  margin-left : 26em;
 }
+
 
 #button-change {
   display: flex;
@@ -76,20 +80,22 @@ body {
 
 
 .arrow-container {
-  position: absolute;
+  position: relative;
   bottom: 2em;
   right: 2em;
+  display: grid;
   width: 150px;
   height: 150px;
-  display: grid;
   grid-template-areas:
     ".    up    ."
     "left .   right"
     ".   down  .";
   place-items: center;
   gap: 6px;
- transform: translate(-80px, 70px); 
+  margin-top: -1em;
+  margin-left: 50em;
 }
+
 
 .arrow {
   width: 50px;
