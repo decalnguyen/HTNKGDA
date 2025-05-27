@@ -1,30 +1,37 @@
-from flask import Flask, Response
 import cv2
+import websockets
+import asyncio
+import numpy as np
 
-app = Flask(__name__)
+WEBSOCKET_URL = "ws://localhost:8000/ws/image"
+VIDEO_PATH = "video.mp4"  # hoặc 0 nếu dùng webcam
 
-# Đường dẫn đến file video
-VIDEO_PATH = "video.mp4"  # ← thay bằng tên file video của bạn
+async def send_raw_frames():
+    try:
+        async with websockets.connect(WEBSOCKET_URL, max_size=None) as websocket:
+            print("🟢 Đã kết nối WebSocket tới server")
 
-def generate_frames():
-    cap = cv2.VideoCapture(VIDEO_PATH)
-    while True:
-        success, frame = cap.read()
-        if not success:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # tua lại từ đầu khi hết video
-            continue
+            cap = cv2.VideoCapture(VIDEO_PATH)
+            frame_id = 0
 
-        # Encode ảnh thành JPEG
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
+            while True:
+                success, frame = cap.read()
+                if not success:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
 
-        # Trả về frame theo chuẩn MJPEG
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                frame = cv2.resize(frame, (240, 240))
+                raw_data = frame.tobytes()
 
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+                await websocket.send(raw_data)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+                print(f"📤 Frame {frame_id} sent | Size: {len(raw_data)} bytes")
+                frame_id += 1
+
+                await asyncio.sleep(1 / 20)
+
+    except Exception as e:
+        print(f"❌ Lỗi kết nối WebSocket: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(send_raw_frames())

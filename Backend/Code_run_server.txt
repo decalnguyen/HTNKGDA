@@ -1,3 +1,6 @@
 python mjpeg_server.py
 python mjpeg_server_video.py
 uvicorn main:app --reload --port 8000
+
+Activate venv
+.\venv\Scripts\activate

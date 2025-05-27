@@ -1,73 +1,79 @@
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse, Response
-import httpx
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 import cv2
 import numpy as np
-import torch
+import asyncio
 
 app = FastAPI()
 
-GATEWAY_STREAM_URL = "http://localhost:5000/video_feed"
+latest_frame = None
+frame_count = 0
 
-# 🧠 Load YOLOv5 model — thay 'best.pt' bằng model của bạn
-# Lần đầu chạy sẽ tự tải yolov5 repo về
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s')  # model mặc định
-model.conf = 0.5  # confidence threshold
-model.iou = 0.45  # NMS IoU threshold
+@app.websocket("/ws/image")
+async def websocket_endpoint(websocket: WebSocket):
+    global latest_frame, frame_count
+    await websocket.accept()
+    print("🟢 WebSocket connected")
 
-# Nếu bạn biết class id cho "fire", ví dụ trong dataset bạn dùng id = 0
-FIRE_CLASS_ID = 0
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            frame_count += 1
+            print(f"📥 Frame {frame_count} received | Size: {len(data)} bytes")
 
-def fire_detection_mjpeg():
-    with httpx.stream("GET", GATEWAY_STREAM_URL, timeout=None) as response:
-        print(f"🔄 Streaming from: {GATEWAY_STREAM_URL}")
-        buffer = b""
-        for chunk in response.iter_bytes():
-            buffer += chunk
-            start = buffer.find(b'\xff\xd8')
-            end = buffer.find(b'\xff\xd9')
-            if start != -1 and end != -1:
-                jpg = buffer[start:end+2]
-                buffer = buffer[end+2:]
-                img = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
-                if img is None:
-                    continue
+            try:
+                img = np.frombuffer(data, dtype=np.uint8).reshape((240, 240, 3))
+            except Exception as e:
+                print(f"❌ Không thể chuyển đổi frame {frame_count}: {e}")
+                continue
 
-                # Resize để dễ xử lý
-                img = cv2.resize(img, (800, 400))
+            img = cv2.resize(img, (800, 400))
 
-                # ==== 🚀 AI phát hiện bằng YOLOv5 ====
-                results = model(img)
-                fire_detected = False
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            lower = np.array([10, 100, 100])
+            upper = np.array([25, 255, 255])
+            mask = cv2.inRange(hsv, lower, upper)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                # Lấy kết quả bbox: [x1, y1, x2, y2, conf, class]
-                for *xyxy, conf, cls in results.xyxy[0]:
-                    class_id = int(cls)
-                    if class_id == FIRE_CLASS_ID:
-                        x1, y1, x2, y2 = map(int, xyxy)
-                        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                        cv2.putText(img, f"FIRE {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        fire_detected = True
+            fire_detected = False
+            for cnt in contours:
+                area = cv2.contourArea(cnt)
+                if area > 500:
+                    x, y, w, h = cv2.boundingRect(cnt)
+                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+                    fire_detected = True
 
-                # Ghi chú lên ảnh
-                if fire_detected:
-                    cv2.putText(img, "🔥 FIRE DETECTED (YOLOv5)", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                else:
-                    cv2.putText(img, "No fire", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            if fire_detected:
+                cv2.putText(img, "🔥 FIRE DETECTED!", (10, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            else:
+                cv2.putText(img, "No fire", (10, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-                # Encode lại ảnh và stream
-                ret, jpeg = cv2.imencode(".jpg", img)
-                if not ret:
-                    continue
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
-                )
+            latest_frame = img
+
+    except WebSocketDisconnect:
+        print("🔴 WebSocket disconnected")
+
+async def mjpeg_generator():
+    global latest_frame
+    while True:
+        if latest_frame is not None:
+            ret, jpeg = cv2.imencode(".jpg", latest_frame)
+            if ret:
+                frame = (b"--frame\r\n"
+                         b"Content-Type: image/jpeg\r\n\r\n" +
+                         jpeg.tobytes() + b"\r\n")
+                yield frame
+        else:
+            blank = np.zeros((400, 800, 3), dtype=np.uint8)
+            _, jpeg = cv2.imencode(".jpg", blank)
+            frame = (b"--frame\r\n"
+                     b"Content-Type: image/jpeg\r\n\r\n" +
+                     jpeg.tobytes() + b"\r\n")
+            yield frame
+        await asyncio.sleep(0.05)
 
 @app.get("/video")
-def stream_video():
-    try:
-        return StreamingResponse(fire_detection_mjpeg(), media_type="multipart/x-mixed-replace; boundary=frame")
-    except Exception as e:
-        print("⚠️ Lỗi khi kết nối stream:", e)
-        return Response("Không thể kết nối tới nguồn MJPEG", status_code=500)
+async def video_stream():
+    return StreamingResponse(mjpeg_generator(), media_type="multipart/x-mixed-replace; boundary=frame")

@@ -25,38 +25,112 @@ body {
   display: block;
 }
 
-.arrow-div {
+.button-div{
   display: flex;
   gap: 10px;
-  transform: translate(-5em, 9em); /* x: phải 5em, y: xuống 10em */
+  transform: translate(-10em, 12em); /* x: phải 5em, y: xuống 10em */
+}
+
+#button-change {
+  display: flex;
+  width: 6em;
+  height: 3em;
+  background-color: #b12d2d;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid black;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+  font-weight: bold;
+  font-family: 'Poppins', sans-serif; /* ✅ Font mềm mại, hiện đại */
+  transition: all 0.3s ease;
+}
+#button-text{
+  transition: color 0.3s ease;
+}
+#button-change:hover {
+  background-color: #d23a3a;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#button-change:active {
+  background-color: #9e1e1e;
+  transform: scale(0.96);
+}
+
+
+/* Hiệu ứng khi hover */
+#button-change:hover {
+  background-color: #d23a3a;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* tạo bóng */
+}
+
+/* Hiệu ứng khi click (active) */
+#button-change:active {
+  background-color: #9e1e1e;
+  transform: scale(0.96); /* thu nhỏ nhẹ để có cảm giác nhấn */
+}
+
+
+.arrow-container {
+  position: absolute;
+  bottom: 2em;
+  right: 2em;
+  width: 150px;
+  height: 150px;
+  display: grid;
+  grid-template-areas:
+    ".    up    ."
+    "left .   right"
+    ".   down  .";
+  place-items: center;
+  gap: 6px;
+ transform: translate(-80px, 70px); 
 }
 
 .arrow {
-  width: 0;
-  height: 0;
-  border-top: 30px solid transparent;
-  border-bottom: 30px solid transparent;
-  border-left: 45px solid red;
-  border-radius: 10px;
+  width: 50px;
+  height: 50px;
+  background-color: red;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
+/* Mũi tên lên */
 .arrow.up {
-  transform: translate(10.8em, 1.5em) rotate(-90deg);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  grid-area: up;
 }
 
+/* Mũi tên xuống */
 .arrow.down {
-  transform: translate(7.5em, 8.5em) rotate(90deg);
-  /* transform: translate(20em, 10em); x: phải 5em, y: xuống 10em */
-
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  grid-area: down;
 }
 
+/* Mũi tên trái */
 .arrow.left {
-  transform: translate(0.5em, 5em) rotate(180deg);
-  /* transform: translate(20em, 10em); x: phải 5em, y: xuống 10em */
-
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+  grid-area: left;
 }
 
+/* Mũi tên phải */
 .arrow.right {
-  transform: translate(4em, 5em);
+  clip-path: polygon(0% 0%, 0% 100%, 100% 50%);
+  grid-area: right;
 }
 
+/* Hover */
+.arrow:hover {
+  background-color: orange;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+/* Click */
+.arrow:active {
+  background-color: orange;
+  transform: scale(0.8) ;
+}

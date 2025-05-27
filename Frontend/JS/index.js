@@ -2,7 +2,27 @@ let arrow_up = document.getElementById('arrow-up');
 let arrow_down = document.getElementById('arrow-down');
 let arrow_left = document.getElementById('arrow-left');
 let arrow_right = document.getElementById('arrow-right');
+let buttonChange = document.getElementById("button-change");
+let buttonText = document.getElementById("button-text");
 
+function button_change_mode(){
+
+  buttonChange.addEventListener("click", () => {
+    const isAuto = buttonText.textContent === "Auto";
+
+    if (isAuto) {
+      // Đổi sang trắng + Control
+      buttonChange.style.backgroundColor = "white";
+      buttonText.textContent = "Control";
+      buttonText.style.color = "#b12d2d"; // đổi màu chữ 
+    } else {
+      // Đổi lại đỏ + Auto
+      buttonChange.style.backgroundColor = "#b12d2d";
+      buttonText.textContent = "Auto";
+      buttonText.style.color = "white";
+    }
+  });
+}
 function arrow_trigger(){
     arrow_up.addEventListener('click',()=>{
         alert("Arrow up picked");
@@ -17,4 +37,5 @@ function arrow_trigger(){
         alert("Arrow right picked");
     });
 }
-arrow_trigger();
+button_change_mode();
+// arrow_trigger();
