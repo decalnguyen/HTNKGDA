@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = YOLO("my_model.pt").to(device)
 model.eval()
 
-FIRE_CLASSES = ['fire']  # Đảm bảo tên lớp trùng với model.names
+FIRE_CLASSES = ['fire']  # Tên lớp 'fire' phải trùng với model.names
 
 # Chuẩn hóa ảnh đầu vào
 transform = T.Compose([
@@ -44,16 +44,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 print(f"❌ Không thể chuyển đổi frame {frame_count}: {e}")
                 continue
 
-            # Resize ảnh cho model
+            # Resize và chuẩn hóa để đưa vào model
             img_for_model = cv2.resize(img, (320, 320))
             input_tensor = transform(img_for_model).unsqueeze(0).to(device)
 
-            # Ảnh để hiển thị (scale lớn)
-            display_img = cv2.resize(img, (320, 320))
-
-            # Tính tỉ lệ scale để vẽ bounding box
-            scale_x = display_img.shape[1] / 320
-            scale_y = display_img.shape[0] / 320
+            # Ảnh hiển thị cũng là 320x320
+            display_img = img_for_model.copy()
 
             with torch.no_grad():
                 results = model(input_tensor)[0]
@@ -68,23 +64,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 label = model.names[cls_id]
 
                 if label in FIRE_CLASSES:
-                    # Scale lại vị trí khung để vẽ trên ảnh lớn
-                    x1 = int(x1 * scale_x)
-                    y1 = int(y1 * scale_y)
-                    x2 = int(x2 * scale_x)
-                    y2 = int(y2 * scale_y)
+                    fire_detected = True
+                    x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
 
                     cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
                     cv2.putText(display_img, f"{label} {conf:.2f}", (x1, y1 - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                    fire_detected = True
 
-            if fire_detected:
-                cv2.putText(display_img, "🔥 FIRE DETECTED (YOLOv11)", (10, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            else:
-                cv2.putText(display_img, "No fire", (10, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            # Ghi dòng chữ trạng thái vào ảnh
+            status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
+            status_color = (0, 255, 0) if fire_detected else (255, 255, 255)
+            cv2.putText(display_img, status_text, (10, 310),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
 
             latest_frame = display_img
 

@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>other_-77-_jpg.rf.2589fdae2430101fa267c18149906c97.jpg</filename>
+	<path>other_-77-_jpg.rf.2589fdae2430101fa267c18149906c97.jpg</path>
+	<source>
+		<database>roboflow.ai</database>
+	</source>
+	<size>
+		<width>416</width>
+		<height>416</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>other</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>47</xmin>
+			<xmax>305</xmax>
+			<ymin>69</ymin>
+			<ymax>221</ymax>
+		</bndbox>
+	</object>
+</annotation>

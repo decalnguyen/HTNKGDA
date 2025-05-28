@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>middle_-3114-_jpg.rf.eb63eb72681d430923b3651a6e027583.jpg</filename>
+	<path>middle_-3114-_jpg.rf.eb63eb72681d430923b3651a6e027583.jpg</path>
+	<source>
+		<database>roboflow.ai</database>
+	</source>
+	<size>
+		<width>416</width>
+		<height>416</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>fire</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>129</xmin>
+			<xmax>241</xmax>
+			<ymin>76</ymin>
+			<ymax>219</ymax>
+		</bndbox>
+	</object>
+</annotation>
