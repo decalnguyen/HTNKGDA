@@ -34,60 +34,72 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            message = await websocket.receive_bytes()
+            try:
+                message = await websocket.receive_bytes()
+            except Exception as e:
+                print(f"[!] Lỗi nhận message: {e}")
+                break
+
             buffer.extend(message)
 
             while True:
-                if expected_size is None and len(buffer) >= 4:
-                    expected_size = struct.unpack(">I", buffer[:4])[0]
-                    buffer = buffer[4:]
+                # Nếu chưa xác định được expected_size mà buffer đủ 4 byte
+                if expected_size is None:
+                    if len(buffer) >= 4:
+                        expected_size = struct.unpack(">I", buffer[:4])[0]
+                        buffer = buffer[4:]
+                    else:
+                        break  # Chưa đủ 4 byte, đợi thêm
 
-                if expected_size is not None and len(buffer) >= expected_size:
-                    frame_data = buffer[:expected_size]
-                    buffer = buffer[expected_size:]
-                    expected_size = None
-                    frame_count += 1
-                    print(f"📥 Frame {frame_count} received | Size: {len(frame_data)} bytes")
+                # Khi đã có expected_size, đợi đủ dữ liệu
+                if expected_size is not None:
+                    if len(buffer) >= expected_size:
+                        frame_data = buffer[:expected_size]
+                        buffer = buffer[expected_size:]
+                        expected_size = None
 
-                    # Decode JPEG
-                    np_arr = np.frombuffer(frame_data, np.uint8)
-                    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                        frame_count += 1
+                        print(f"📥 Frame {frame_count} received | Size: {len(frame_data)} bytes")
 
-                    if img is None:
-                        print(f"[!] Frame {frame_count} không thể decode JPEG.")
-                        continue
+                        # Decode JPEG
+                        np_arr = np.frombuffer(frame_data, np.uint8)
+                        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-                    # Resize ảnh và chuẩn hóa để đưa vào model
-                    img_for_model = cv2.resize(img, (320, 320))
-                    img_for_model = cv2.cvtColor(img_for_model, cv2.COLOR_BGR2RGB)
-                    input_tensor = transform(img_for_model).unsqueeze(0).to(device)
+                        if img is None:
+                            print(f"[!] Frame {frame_count} không thể decode JPEG.")
+                            continue
 
-                    # ===  Dự đoán ===
-                    with torch.no_grad():
-                        results = model(input_tensor)[0]
+                        # Resize ảnh và chuẩn hóa để đưa vào model
+                        img_for_model = cv2.resize(img, (320, 320))
+                        img_for_model = cv2.cvtColor(img_for_model, cv2.COLOR_BGR2RGB)
+                        input_tensor = transform(img_for_model).unsqueeze(0).to(device)
 
-                    # ===  Vẽ bounding box lên ảnh ===
-                    annotated_img = img.copy()
-                    boxes = results.boxes
-                    if boxes is not None and len(boxes) > 0:
-                        for box, cls in zip(boxes.xyxy, boxes.cls):
-                            x1, y1, x2, y2 = map(int, box[:4])
-                            label = model.names[int(cls)]
-                            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                            cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                        # ===  Dự đoán ===
+                        with torch.no_grad():
+                            results = model(input_tensor)[0]
 
-                    # Ghi trạng thái đơn giản
-                    fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
-                    status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
-                    status_color = (0, 0, 255) if fire_detected else (255, 255, 255)
-                    cv2.putText(annotated_img, status_text, (10, 310), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+                        # ===  Vẽ bounding box lên ảnh ===
+                        annotated_img = img.copy()
+                        boxes = results.boxes
+                        if boxes is not None and len(boxes) > 0:
+                            for box, cls in zip(boxes.xyxy, boxes.cls):
+                                x1, y1, x2, y2 = map(int, box[:4])
+                                label = model.names[int(cls)]
+                                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                                cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-                    latest_frame = annotated_img
-                else:
-                    break
+                        # Ghi trạng thái đơn giản
+                        fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
+                        status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
+                        status_color = (0, 0, 255) if fire_detected else (255, 255, 255)
+                        cv2.putText(annotated_img, status_text, (10, 310), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
 
+                        latest_frame = annotated_img
+                    else:
+                        break  # Chưa đủ dữ liệu, đợi thêm
     except WebSocketDisconnect:
         print("🔴 WebSocket disconnected")
+
 
 
 
