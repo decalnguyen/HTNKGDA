@@ -29,29 +29,6 @@ body {
   display: block;
 }
 
-.button-div {
-  margin-top: 1em;
-  margin-left : 26em;
-}
-
-
-#button-change {
-  display: flex;
-  width: 6em;
-  height: 3em;
-  background-color: #b12d2d;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid black;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
-  font-weight: bold;
-  font-family: 'Poppins', sans-serif; /* ✅ Font mềm mại, hiện đại */
-  transition: all 0.3s ease;
-}
 
 .arrow-container {
   position: relative;
@@ -66,8 +43,8 @@ body {
     ".   down  .";
   place-items: center;
   gap: 6px;
-  margin-top: -1em;
-  margin-left: 50em;
+  margin-top: 3em;
+  margin-left: 24em;
 }
 
 

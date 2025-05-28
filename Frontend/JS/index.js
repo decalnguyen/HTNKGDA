@@ -5,24 +5,6 @@ let arrow_right = document.getElementById('arrow-right');
 let button_change = document.getElementById("button-change");
 let button_text = document.getElementById("button-text");
 
-function button_change_mode(){
-
-  button_change.addEventListener("click", () => {
-    const isAuto = button_text.textContent === "Auto";
-
-    if (isAuto) {
-      // Đổi sang trắng + Control
-      button_change.style.backgroundColor = "white";
-      button_text.textContent = "Control";
-      button_text.style.color = "#b12d2d"; // đổi màu chữ 
-    } else {
-      // Đổi lại đỏ + Auto
-      button_change.style.backgroundColor = "#b12d2d";
-      button_text.textContent = "Auto";
-      button_text.style.color = "white";
-    }
-  });
-}
 function arrow_trigger(){
     arrow_up.addEventListener('click',()=>{
         alert("Arrow up picked");
@@ -129,51 +111,37 @@ function RotateRight(){
     });
   });
 }
-function ChangeMode(){
-  button_change.addEventListener("click", () => {
-    fetch("http://localhost:8000/change_mode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      }
-    })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error("Server error: " + response.statusText);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      console.log("Server responded:", data);
-    })
-    .catch((error) => {
-      console.error("Error changing mode :", error);
-    });
-  });
-}
-function updateButtonColor() {
-  const text = button_change.textContent.trim();
-  if (text === "Fire Detected") {
-    button_change.style.backgroundColor = "red";
-  } else if (text === "No Fire") {
-    button_change.style.backgroundColor = "green";
-  }
-}
 
-// Gọi hàm mỗi khi nội dung thay đổi
-const observer = new MutationObserver(updateButtonColor);
+const ws = new WebSocket("ws://localhost:8000/ws/image");
 
-observer.observe(button, {
-  childList: true,
-  subtree: true,
-  characterData: true
-});
-// Gọi lần đầu khi trang vừa load
-button_change_mode();
-// arrow_trigger();
+let currentStatus = "No Fire";
+let blink = false;
+
+const statusTextEl = document.getElementById("button-text");
+const statusContainer = document.getElementById("fire-status");
+
+// Hàm nhấp nháy định kỳ
+setInterval(() => {
+    blink = !blink;
+
+    if (currentStatus === "Fire Detected") {
+        statusContainer.style.backgroundColor = blink ? "#ff0000" : "#880000";
+        statusTextEl.style.color = "white";
+    } else {
+        statusContainer.style.backgroundColor = blink ? "#00cc00" : "#006600";
+        statusTextEl.style.color = "white";
+    }
+}, 500); // 500ms = 0.5s
+
+// Khi nhận được WebSocket message, chỉ cập nhật trạng thái hiện tại
+ws.onmessage = function (event) {
+    currentStatus = event.data;
+    console.log("Trạng thái nhận được:", currentStatus);
+    statusTextEl.textContent = currentStatus;
+};
+
+
 RotateUp();
 RotateDown();
 RotateLeft();
 RotateRight();
-ChangeMode();
-updateButtonColor();

@@ -7,13 +7,15 @@ import torch
 import struct
 import torchvision.transforms as T
 from ultralytics import YOLO
+from fastapi.responses import JSONResponse
+
 
 app = FastAPI()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = YOLO("my_model.pt").to(device)
 model.eval()
-
+fire_status = "No Fire"
 transform = T.Compose([
     T.ToPILImage(),
     T.Resize((320, 320)),
@@ -82,17 +84,30 @@ async def websocket_endpoint(websocket: WebSocket):
                         annotated_img = img.copy()
                         boxes = results.boxes
                         if boxes is not None and len(boxes) > 0:
+                            h_orig, w_orig = img.shape[:2]
+                            scale_x = w_orig / 320
+                            scale_y = h_orig / 320
+
                             for box, cls in zip(boxes.xyxy, boxes.cls):
-                                x1, y1, x2, y2 = map(int, box[:4])
+                                x1, y1, x2, y2 = box[:4]
+                                # Scale back to original image size
+                                x1 = int(x1 * scale_x)
+                                y1 = int(y1 * scale_y)
+                                x2 = int(x2 * scale_x)
+                                y2 = int(y2 * scale_y)
+
                                 label = model.names[int(cls)]
                                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                                cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                                cv2.putText(annotated_img, label, (x1, max(0, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
                         # Ghi trạng thái đơn giản
                         fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
-                        status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
+
+                        # Annotate ảnh
+                        status_text = "FIRE DETECTED" if fire_detected else "NO FIRE"
                         status_color = (0, 0, 255) if fire_detected else (255, 255, 255)
-                        cv2.putText(annotated_img, status_text, (10, 310), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+
+                        cv2.putText(annotated_img, status_text, (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
 
                         latest_frame = annotated_img
                     else:
