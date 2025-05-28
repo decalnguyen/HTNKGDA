@@ -52,32 +52,6 @@ body {
   font-family: 'Poppins', sans-serif; /* ✅ Font mềm mại, hiện đại */
   transition: all 0.3s ease;
 }
-#button-text{
-  transition: color 0.3s ease;
-}
-#button-change:hover {
-  background-color: #d23a3a;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-#button-change:active {
-  background-color: #9e1e1e;
-  transform: scale(0.96);
-}
-
-
-/* Hiệu ứng khi hover */
-#button-change:hover {
-  background-color: #d23a3a;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* tạo bóng */
-}
-
-/* Hiệu ứng khi click (active) */
-#button-change:active {
-  background-color: #9e1e1e;
-  transform: scale(0.96); /* thu nhỏ nhẹ để có cảm giác nhấn */
-}
-
 
 .arrow-container {
   position: relative;

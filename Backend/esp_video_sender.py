@@ -4,10 +4,10 @@ import cv2
 import struct
 
 VIDEO_PATH = "video.mp4"
-SERVER_URI = "ws://localhost:8000/ws/image"
+SERVER_URI = "ws://localhost:8080"
 
 async def send_video():
-    async with websockets.connect(SERVER_URI, ping_interval=None,max_size=None) as websocket:
+    async with websockets.connect(SERVER_URI, ping_interval=None) as websocket:
         print("[✓] Đã kết nối tới server")
 
         cap = cv2.VideoCapture(VIDEO_PATH)

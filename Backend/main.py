@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import asyncio
 import torch
+import struct
 import torchvision.transforms as T
 from ultralytics import YOLO
 
@@ -28,51 +29,66 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("🟢 WebSocket connected")
 
+    buffer = bytearray()
+    expected_size = None
+
     try:
         while True:
-            data = await websocket.receive_bytes()
-            frame_count += 1
-            print(f"📥 Frame {frame_count} received | Size: {len(data)} bytes")
+            message = await websocket.receive_bytes()
+            buffer.extend(message)
 
-            try:
-                img = np.frombuffer(data, dtype=np.uint8).reshape((240, 240, 3))
-            except Exception as e:
-                print(f" Không thể chuyển đổi frame {frame_count}: {e}")
-                continue
+            while True:
+                if expected_size is None and len(buffer) >= 4:
+                    expected_size = struct.unpack(">I", buffer[:4])[0]
+                    buffer = buffer[4:]
 
-            # Resize ảnh và chuẩn hóa để đưa vào model
-            img_for_model = cv2.resize(img, (320, 320))
-            img_for_model = cv2.cvtColor(img_for_model, cv2.COLOR_BGR2RGB)  # <- thêm dòng này
-            input_tensor = transform(img_for_model).unsqueeze(0).to(device)
+                if expected_size is not None and len(buffer) >= expected_size:
+                    frame_data = buffer[:expected_size]
+                    buffer = buffer[expected_size:]
+                    expected_size = None
+                    frame_count += 1
+                    print(f"📥 Frame {frame_count} received | Size: {len(frame_data)} bytes")
 
-            # ===  Dự đoán ===
-            with torch.no_grad():
-                results = model(input_tensor)[0]
+                    # Decode JPEG
+                    np_arr = np.frombuffer(frame_data, np.uint8)
+                    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-            # ===  Lấy ảnh có vẽ bounding box từ kết quả ===
-            # annotated_img = results.plot()[0]  # Đây là ảnh có bbox đã vẽ sẵn
+                    if img is None:
+                        print(f"[!] Frame {frame_count} không thể decode JPEG.")
+                        continue
 
-            # ✅ Thay bằng:
-            annotated_img = img.copy()
-            boxes = results.boxes
-            if boxes is not None and len(boxes) > 0:
-                for box, cls in zip(boxes.xyxy, boxes.cls):
-                    x1, y1, x2, y2 = map(int, box[:4])
-                    label = model.names[int(cls)]
-                    cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                    cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)           
+                    # Resize ảnh và chuẩn hóa để đưa vào model
+                    img_for_model = cv2.resize(img, (320, 320))
+                    img_for_model = cv2.cvtColor(img_for_model, cv2.COLOR_BGR2RGB)
+                    input_tensor = transform(img_for_model).unsqueeze(0).to(device)
 
-            # Ghi trạng thái đơn giản
-            fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
-            status_text = " FIRE DETECTED" if fire_detected else "No fire"
-            status_color = (0, 255, 0) if fire_detected else (255, 255, 255)
-            cv2.putText(annotated_img, status_text, (10, 310),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+                    # ===  Dự đoán ===
+                    with torch.no_grad():
+                        results = model(input_tensor)[0]
 
-            latest_frame = annotated_img
+                    # ===  Vẽ bounding box lên ảnh ===
+                    annotated_img = img.copy()
+                    boxes = results.boxes
+                    if boxes is not None and len(boxes) > 0:
+                        for box, cls in zip(boxes.xyxy, boxes.cls):
+                            x1, y1, x2, y2 = map(int, box[:4])
+                            label = model.names[int(cls)]
+                            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                            cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+                    # Ghi trạng thái đơn giản
+                    fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
+                    status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
+                    status_color = (0, 0, 255) if fire_detected else (255, 255, 255)
+                    cv2.putText(annotated_img, status_text, (10, 310), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+
+                    latest_frame = annotated_img
+                else:
+                    break
 
     except WebSocketDisconnect:
-        print(" WebSocket disconnected")
+        print("🔴 WebSocket disconnected")
+
 
 
 async def mjpeg_generator():
@@ -95,4 +111,4 @@ async def mjpeg_generator():
 
 @app.get("/video")
 async def video_stream():
-    return StreamingResponse(mjpeg_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(mjpeg_generator(), media_type="multipart/x-mixed-replace; boundary=frame") 

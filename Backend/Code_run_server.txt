@@ -1,5 +1,6 @@
 python mjpeg_server.py
 python mjpeg_server_video.py
+python esp_video_sender.py
 uvicorn main:app --reload --port 8000
 
 Activate venv

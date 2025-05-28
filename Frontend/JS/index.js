@@ -151,6 +151,24 @@ function ChangeMode(){
     });
   });
 }
+function updateButtonColor() {
+  const text = button_change.textContent.trim();
+  if (text === "Fire Detected") {
+    button_change.style.backgroundColor = "red";
+  } else if (text === "No Fire") {
+    button_change.style.backgroundColor = "green";
+  }
+}
+
+// Gọi hàm mỗi khi nội dung thay đổi
+const observer = new MutationObserver(updateButtonColor);
+
+observer.observe(button, {
+  childList: true,
+  subtree: true,
+  characterData: true
+});
+// Gọi lần đầu khi trang vừa load
 button_change_mode();
 // arrow_trigger();
 RotateUp();
@@ -158,3 +176,4 @@ RotateDown();
 RotateLeft();
 RotateRight();
 ChangeMode();
+updateButtonColor();
