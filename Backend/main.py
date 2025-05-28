@@ -9,14 +9,10 @@ from ultralytics import YOLO
 
 app = FastAPI()
 
-# === 🧠 Load mô hình YOLO đã huấn luyện ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = YOLO("my_model.pt").to(device)
 model.eval()
 
-FIRE_CLASSES = ['fire']  # Tên lớp 'fire' phải trùng với model.names
-
-# Chuẩn hóa ảnh đầu vào
 transform = T.Compose([
     T.ToPILImage(),
     T.Resize((320, 320)),
@@ -41,46 +37,42 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 img = np.frombuffer(data, dtype=np.uint8).reshape((240, 240, 3))
             except Exception as e:
-                print(f"❌ Không thể chuyển đổi frame {frame_count}: {e}")
+                print(f" Không thể chuyển đổi frame {frame_count}: {e}")
                 continue
 
-            # Resize và chuẩn hóa để đưa vào model
+            # Resize ảnh và chuẩn hóa để đưa vào model
             img_for_model = cv2.resize(img, (320, 320))
+            img_for_model = cv2.cvtColor(img_for_model, cv2.COLOR_BGR2RGB)  # <- thêm dòng này
             input_tensor = transform(img_for_model).unsqueeze(0).to(device)
 
-            # Ảnh hiển thị cũng là 320x320
-            display_img = img_for_model.copy()
-
+            # ===  Dự đoán ===
             with torch.no_grad():
                 results = model(input_tensor)[0]
-                boxes = results.boxes
 
-            fire_detected = False
+            # ===  Lấy ảnh có vẽ bounding box từ kết quả ===
+            # annotated_img = results.plot()[0]  # Đây là ảnh có bbox đã vẽ sẵn
 
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                conf = float(box.conf[0])
-                cls_id = int(box.cls[0])
-                label = model.names[cls_id]
+            # ✅ Thay bằng:
+            annotated_img = img.copy()
+            boxes = results.boxes
+            if boxes is not None and len(boxes) > 0:
+                for box, cls in zip(boxes.xyxy, boxes.cls):
+                    x1, y1, x2, y2 = map(int, box[:4])
+                    label = model.names[int(cls)]
+                    cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    cv2.putText(annotated_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)           
 
-                if label in FIRE_CLASSES:
-                    fire_detected = True
-                    x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-
-                    cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                    cv2.putText(display_img, f"{label} {conf:.2f}", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-            # Ghi dòng chữ trạng thái vào ảnh
-            status_text = "🔥 FIRE DETECTED" if fire_detected else "No fire"
+            # Ghi trạng thái đơn giản
+            fire_detected = any(model.names[int(cls)] == "fire" for cls in results.boxes.cls)
+            status_text = " FIRE DETECTED" if fire_detected else "No fire"
             status_color = (0, 255, 0) if fire_detected else (255, 255, 255)
-            cv2.putText(display_img, status_text, (10, 310),
+            cv2.putText(annotated_img, status_text, (10, 310),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
 
-            latest_frame = display_img
+            latest_frame = annotated_img
 
     except WebSocketDisconnect:
-        print("🔴 WebSocket disconnected")
+        print(" WebSocket disconnected")
 
 
 async def mjpeg_generator():
