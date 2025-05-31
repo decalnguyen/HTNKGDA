@@ -46,8 +46,8 @@ const char* websocket_path = "/ws";
 StaticJsonDocument<200> doc;
 
 // Cấu hình FPS và chất lượng - TỐI ƯU CHO 30FPS
-const int targetFPS = 12;                  // Mục tiêu 30 khung hình/giây
-const int jpegQuality = 20;                // Chất lượng JPEG cân bằng (1-63)
+const int targetFPS = 10;                  //khung hình/giây
+const int jpegQuality = 15;                // Chất lượng JPEG cân bằng (1-63)
 const framesize_t frameSize = FRAMESIZE_240X240; // Độ phân giải HQVGA (320x240)
 unsigned long lastFrameTime = 0;
 bool isStreaming = false;
@@ -76,7 +76,7 @@ void setup() {
 }
 
 void loop() {
-  webSocket.loop();  // Luôn chạy WebSocket vòng lặp
+  webSocket.loop();  
 
   switch(mode) {
     case MODE_WIFI_CONFIG:
@@ -96,12 +96,12 @@ void loop() {
     case MODE_WEBSOCKET_CONFIG:
       if (!websocket_initialized) {
       //  delay(1000);
-        Serial.print(websocket_host);
-        Serial.print("  ");
-        Serial.print(websocket_port);
-        Serial.print("  ");
-        Serial.print(websocket_path);
-        Serial.println("  ");
+        //serial.print(websocket_host);
+        //serial.print("  ");
+        //serial.print(websocket_port);
+        //serial.print("  ");
+        //serial.print(websocket_path);
+        //serial.println("  ");
         webSocket.begin(websocket_host, websocket_port, websocket_path);
         webSocket.onEvent(webSocketEvent);
         webSocket.setReconnectInterval(2000);
@@ -143,18 +143,19 @@ void setupCamera(){
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;         // Tần số XCLK 24MHz
+  config.xclk_freq_hz = 24000000;         // Tần số XCLK 24MHz
   config.pixel_format = PIXFORMAT_JPEG;
   
   // Cấu hình chất lượng ảnh cho FPS cao
   config.frame_size = frameSize;
   config.jpeg_quality = jpegQuality;
-  config.fb_count = 3;                     // Tăng buffer lên 3 để hỗ trợ FPS cao
+  config.fb_count = 2;                     // Tăng buffer lên 3 để hỗ trợ FPS cao
 
   // Khởi động camera
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Lỗi khởi động camera: 0x%x", err);
+    setupCamera();
     return;
   }
 }
@@ -163,31 +164,31 @@ void connectToWiFi(const char* ssid, const char* password){
   WiFi.disconnect(true);
   delay(200);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to Wifi");
+  //serial.print("Connecting to Wifi");
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    //serial.print(".");
   }
 
-  Serial.print("\n");
-  Serial.print(WiFi.SSID());
-  Serial.println(" connected!");
+  //serial.print("\n");
+  //serial.print(WiFi.SSID());
+  //serial.println(" connected!");
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
-      Serial.println("[WebSocket] Connected to Gateway.");
+      //serial.println("[WebSocket] Connected to Gateway.");
       webSocket.sendTXT("{\"device\": \"esp-cam\"}");
       break;
 
     case WStype_DISCONNECTED:
-      Serial.println("[WebSocket] Disconnected to gateway.");
+      //serial.println("[WebSocket] Disconnected to gateway.");
       break;
 
     case WStype_TEXT:
-      Serial.printf("[WebSocket] Got message: %s\n", payload);
+      //serial.printf("[WebSocket] Got message: %s\n", payload);
       readGatewayMessage((char*)payload);
       break;
       
@@ -197,11 +198,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 }
 
 void readGatewayMessage(char json[]) {
-  //Serial.println(json);
+  ////serial.println(json);
   DeserializationError err = deserializeJson(doc, json);
   if (err) {
-    Serial.print("Lỗi JSON: ");
-    Serial.println(err.f_str());
+    //serial.print("Lỗi JSON: ");
+    //serial.println(err.f_str());
     return;
   }
 
@@ -211,10 +212,10 @@ void readGatewayMessage(char json[]) {
       strcpy(ssid, doc["ssid"]);
       strcpy(password, doc["password"]);
       strcpy(websocket_host, doc["IP"]);
-      Serial.printf("ssid: %s | password: %s\n", ssid, password);
+      //serial.printf("ssid: %s | password: %s\n", ssid, password);
 
       webSocket.sendTXT("{\"cmd\": 10, \"device\": 0}");
-      Serial.printf("Sent cmd: 10, device: 0");
+      //serial.printf("Sent cmd: 10, device: 0");
 
       mode = MODE_WIFI_CONFIG;
       wifi_flag = true;
@@ -225,9 +226,9 @@ void readGatewayMessage(char json[]) {
 
 void sendImage(){
   // Tính thời gian giữa các frame để đạt target FPS
-  frameDelay = 1000 / targetFPS;
+  frameDelay = 955 / targetFPS;
   now = millis();
-  Serial.println("Gửi ảnh tới Gateway...");
+  //serial.println("Gửi ảnh tới Gateway...");
 
   if (now - lastFrameTime >= frameDelay) {
     lastFrameTime = now;
@@ -245,18 +246,17 @@ void sendImage(){
       header[2] = (imageSize >> 8) & 0xFF;
       header[3] = imageSize & 0xFF;
       webSocket.sendBIN(header, 4);
-      delay(1);  // nhỏ để tránh nghẽn mạng
+      delay(1); 
 
       // Chia nhỏ ảnh thành nhiều gói để gửi dần
       for (uint32_t i = 0; i < imageSize; i += CHUNK_SIZE) {
         uint32_t chunkLen = CHUNK_SIZE < imageSize - i ? CHUNK_SIZE : imageSize - i;
         webSocket.sendBIN(imageData + i, chunkLen);
-        delay(1);  // tránh tràn buffer WiFi
+        delay(10);  
       }
 
       // Trả lại bộ nhớ ảnh cho hệ thống
       esp_camera_fb_return(fb);
     }
   }
-  //Serial.printf("Free heap: %u\n", ESP.getFreeHeap());
 }
