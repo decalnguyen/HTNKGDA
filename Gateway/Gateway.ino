@@ -1,5 +1,4 @@
 #include <WiFi.h>
-// #include <SPIFFS.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsClient.h>
@@ -26,13 +25,9 @@ AsyncWebSocket* Node_Gateway_Async = new AsyncWebSocket("/ws");
 
 // declare Sync client
 WebSocketsClient webSocket;
-// const char *websocket_host = "192.168.215.168"; // path ngrog
-// const uint16_t websocket_port = 8000;
-// const char *websocket_path = "/ws/image";
-
-const char *websocket_host = "192.168.141.235"; // path ngrog
+const char *websocket_host = "18.141.13.46";
 const uint16_t websocket_port = 8000;
-const char *websocket_path = "/";
+const char *websocket_path = "/ws/image";
 
 // declare Sync server
 WebSocketsServer Node_Gateway(80);
@@ -56,8 +51,8 @@ bool message_wifi_flag = false;
 bool message_ack_flag = false;
 bool sending_client = true;
 bool captured_image_flag = false;
+bool server_connected_flag = false;
 bool server_sending_flag = false;
-//bool node_connected = false;
 
 const char htmlPage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -83,7 +78,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     <label for="ssid">Tên Wi-Fi (SSID):</label>
     <input type="text" id="ssid" name="ssid" required>
     <label for="password">Mật khẩu:</label>
-    <input type="password" id="password" name="password" required>
+    <input type="password" id="password" name="password" placeholder="(Để trống nếu không có mật khẩu)">
     <button type="submit">Kết nối</button>
   </form>
   <script>
@@ -182,20 +177,9 @@ void setup() {
   Serial.print("AP IP address: ");
   Serial.println(WiFi.softAPIP());
 
-  // begin on SPIFFS
-  // if (!SPIFFS.begin(true))
-  // {
-  //   Serial.println("SPIFFS Mount Failed");
-  //   return;
-  // }
-
   // WebSocket
   Node_Gateway_Async->onEvent(onEvent);
   HTTPserver->addHandler(Node_Gateway_Async);
-
-  // Web server
-  // server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
-
   
   HTTPserver->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", htmlPage); // Gửi HTML từ PROGMEM
@@ -279,13 +263,14 @@ void loop() {
     // Turn on websocket gateway - server
     webSocket.begin(websocket_host, websocket_port, websocket_path);
     webSocket.onEvent(webSocketEvent);
-    webSocket.setReconnectInterval(5000);
+    webSocket.setReconnectInterval(2000);
     
     // Turn on websocket gateway - node
 
     Node_Gateway.begin();
     Node_Gateway.onEvent(serverEvent);
     
+    delay(200);
     state = STATE_FORWARDING;
     Serial.print("State: ");
     Serial.println(state);
@@ -295,7 +280,7 @@ void loop() {
     Node_Gateway.loop();
 
     // node send image data
-    if(captured_image_flag) {
+    if(captured_image_flag && server_connected_flag) {
       webSocket.sendBIN(frame.data(), frame.size()); // send to server
       Serial.println("Gui den server.");
       captured_image_flag = false;
@@ -388,7 +373,7 @@ void serverEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
       newMessage = true;
       break;
     case WStype_BIN:
-      Serial.printf("Đã nhận %d byte dữ liệu nhị phân từ client #%u\n", length);
+      //Serial.printf("Đã nhận %d byte dữ liệu nhị phân từ client #%u\n", length);
       captured_image_flag = true;
       frame.assign(payload, payload + length);  
       break;
@@ -433,11 +418,13 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_CONNECTED:
       Serial.println("[WS] Connected to server");
-      webSocket.sendTXT("{\"gateway\": \"hello Server\"}"); 
+      //webSocket.sendTXT("{\"gateway\": \"hello Server\"}"); 
+      server_connected_flag = true;
       break;
 
     case WStype_DISCONNECTED:
       Serial.println("[WS] Disconnected to server");
+      server_connected_flag = false;
       break;
 
     case WStype_TEXT:
