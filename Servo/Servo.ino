@@ -4,17 +4,15 @@
 #include <ArduinoJson.h>
 #include <ESP32Servo.h>
 
-#define MAX_LEFT -400
-#define MAX_RIGHT 400
-#define MAX_UP 400
-#define MAX_DOWN -400
+#define MAX_LEFT -2000
+#define MAX_RIGHT 2000
+#define MAX_UP 1200
+#define MAX_DOWN -2000
 Servo ServoLR;
 Servo ServoUD;
 
 #define CMD_WIFI  1
-#define CMD_SERVO 2
-
-char deviceName[20] = "esp32-node2"; 
+#define CMD_SERVO 2 
 
 enum Mode {
     MODE_WIFI_CONFIG,
@@ -27,8 +25,8 @@ Mode mode = MODE_WIFI_CONFIG;
 WebSocketsClient webSocket;
 
 char websocket_host[20] = "192.168.4.1";
-const uint16_t websocket_port = 80;
-const char* websocket_path = "/ws";
+uint16_t websocket_port = 80;
+char websocket_path[10] = "/ws";
 
 StaticJsonDocument<200> doc;
 
@@ -90,7 +88,7 @@ void loop() {
         Serial.println("  ");
         webSocket.begin(websocket_host, websocket_port, websocket_path);
         webSocket.onEvent(webSocketEvent);
-        webSocket.setReconnectInterval(4000);
+        webSocket.setReconnectInterval(2000);
         websocket_initialized = true;
 
       if (changing_wifi_time == 1)
@@ -106,13 +104,6 @@ void loop() {
         // Serial.print(ServoLR.read());
         // Serial.print("   UD: ");
         // Serial.println(ServoUD.read());
-        
-        StaticJsonDocument<100> sendDoc;
-        sendDoc["lr"] = ServoLR.read();
-        sendDoc["ud"] = ServoUD.read();
-        char buffer[100];
-        serializeJson(sendDoc, buffer);
-        webSocket.sendTXT(buffer);
       }
       break;
     default:
@@ -140,21 +131,39 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
       Serial.println("[WebSocket] Connected to Gateway.");
-      webSocket.sendTXT("{\"device\": \"esp-2\"}");
+      webSocket.sendTXT("{\"device\": \"esp-servo\"}");
       break;
 
     case WStype_DISCONNECTED:
       Serial.println("[WebSocket] Disconnected to gateway.");
       break;
 
-    case WStype_TEXT:
+    case WStype_TEXT:{
       Serial.printf("[WebSocket] Got message: %s\n", payload);
-      readGatewayMessage((char*)payload);
+      // Tạo document tạm để kiểm tra nội dung là số hay object
+      StaticJsonDocument<64> tempDoc;
+      DeserializationError err = deserializeJson(tempDoc, payload);
+      if (err) {
+        Serial.print("Lỗi JSON (WS TEXT): ");
+        Serial.println(err.f_str());
+        return;
+      }
+
+      JsonVariant variant = tempDoc.as<JsonVariant>();
+      if (variant.is<int>()) {
+        // Nếu chỉ là một số
+        servoAction = variant.as<int>();
+        Serial.printf("Servo (simple): %d\n", servoAction);
+        servo_flag = true;
+      } else {
+        // Nếu là object (dạng { "cmd": ... })
+        readGatewayMessage((char*)payload);
+      }
       break;
-      
+    }  
     default:
       break;
-  }
+    }
 }
 
 void readGatewayMessage(char json[]) {
@@ -171,7 +180,9 @@ void readGatewayMessage(char json[]) {
     case CMD_WIFI:
       strcpy(ssid, doc["ssid"]);
       strcpy(password, doc["password"]);
-      strcpy(websocket_host, doc["IP"]);
+      strcpy(websocket_host,"18.141.13.46");
+      websocket_port = 8000;
+      strcpy(websocket_path,"/ws/esp32");
       Serial.printf("ssid: %s | password: %s\n", ssid, password);
       delay(200);
       webSocket.sendTXT("{\"cmd\": 10, \"device\": 1}");
@@ -182,13 +193,12 @@ void readGatewayMessage(char json[]) {
       mode = MODE_WIFI_CONFIG;
       
     //  websocket_initialized = false; // Để kết nối lại WebSocket ở IP mới
-      break;
-
-    case CMD_SERVO:
-      servoAction = doc["servo"];
-      Serial.printf("Servo: %d\n", servoAction);
-      servo_flag = true;
-      break;
+    break;
+    // case CMD_SERVO:
+    //   servoAction = doc["servo"];
+    //   Serial.printf("Servo: %d\n", servoAction);
+    //   servo_flag = true;
+    //   break;
 
     default:
       break;
@@ -200,22 +210,22 @@ void controlServo() {
 
   // Nếu chưa quay → bắt đầu
   if (!running) {
-    if (clockwise == 6 && thresholdLR < MAX_RIGHT) {
+    if (clockwise == 4 && thresholdLR < MAX_RIGHT) {
       thresholdLR += intervalTime;
       ServoLR.write(105);  // quay phải
       Serial.println("RIGHT");
     }
-    else if (clockwise == 4 && thresholdLR > MAX_LEFT) {
+    else if (clockwise == 2 && thresholdLR > MAX_LEFT) {
       thresholdLR -= intervalTime;
       ServoLR.write(79);   // quay trái
       Serial.println("LEFT");
     }
-    else if (clockwise == 2 && thresholdUD > MAX_DOWN) {
+    else if (clockwise == 1 && thresholdUD > MAX_DOWN) {
       thresholdUD -= intervalTime;
       ServoUD.write(79);   // quay xuống
       Serial.println("DOWN");
     }
-    else if (clockwise == 8 && thresholdUD < MAX_UP) {
+    else if (clockwise == 3 && thresholdUD < MAX_UP) {
       thresholdUD += intervalTime;
       ServoUD.write(105);  // quay lên
       Serial.println("UP");
