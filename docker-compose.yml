@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  backend:
+    build: ./Backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    build: ./Frontend
+    container_name: frontend
+    ports:
+      - "3000:80"
+    environment:
+      - BASE_URL=http://YOUR_BACKEND_IP:8000
+    volumes:
+      - ./env.js:/usr/share/nginx/html/env.js:ro

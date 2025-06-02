@@ -5,29 +5,18 @@ let arrow_right = document.getElementById('arrow-right');
 let button_change = document.getElementById("button-change");
 let button_text = document.getElementById("button-text");
 
-function arrow_trigger(){
-    arrow_up.addEventListener('click',()=>{
-        alert("Arrow up picked");
-    });
-    arrow_down.addEventListener('click',()=>{
-        alert("Arrow down picked");
-    });
-    arrow_left.addEventListener('click',()=>{
-        alert("Arrow left picked");
-    });
-    arrow_right.addEventListener('click',()=>{
-        alert("Arrow right picked");
-    });
-}
+const BASE_URL = window?.env?.BASE_URL || "http://localhost:8000";  // fallback if env not defined
+
 function RotateUp(){
-  arrow_up .addEventListener("click", () => {
-    fetch("http://localhost:8000/rotate", {
+  arrow_up.addEventListener("click", () => {
+    fetch(`${BASE_URL}/servo/control`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ direction: "rotate-up" }),
+      body: JSON.stringify({ code : 1}),
     })
+    console.log(4,`${BASE_URL}`)
     .then((response) => {
       if (!response.ok) {
         throw new Error("Server error: " + response.statusText);
@@ -42,14 +31,15 @@ function RotateUp(){
     });
   });
 }
+
 function RotateDown(){
-  arrow_down .addEventListener("click", () => {
-    fetch("http://localhost:8000/rotate", {
+  arrow_down.addEventListener("click", () => {
+    fetch(`${BASE_URL}/servo/control`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ direction: "rotate-down" }),
+      body: JSON.stringify({ code: 3}),
     })
     .then((response) => {
       if (!response.ok) {
@@ -65,14 +55,15 @@ function RotateDown(){
     });
   });
 }
+
 function RotateLeft(){
-  arrow_left .addEventListener("click", () => {
-    fetch("http://localhost:8000/rotate", {
+  arrow_left.addEventListener("click", () => {
+    fetch(`${BASE_URL}/servo/control`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ direction: "rotate-left" }),
+      body: JSON.stringify({ code: 4 }),
     })
     .then((response) => {
       if (!response.ok) {
@@ -88,14 +79,15 @@ function RotateLeft(){
     });
   });
 }
+
 function RotateRight(){
-  arrow_right .addEventListener("click", () => {
-    fetch("http://localhost:8000/rotate", {
+  arrow_right.addEventListener("click", () => {
+    fetch(`${BASE_URL}/servo/control`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ direction: "rotate-right" }),
+      body: JSON.stringify({code: 2 }),
     })
     .then((response) => {
       if (!response.ok) {
@@ -111,35 +103,6 @@ function RotateRight(){
     });
   });
 }
-
-const ws = new WebSocket("ws://localhost:8000/ws/image");
-
-let currentStatus = "No Fire";
-let blink = false;
-
-const statusTextEl = document.getElementById("button-text");
-const statusContainer = document.getElementById("fire-status");
-
-// Hàm nhấp nháy định kỳ
-setInterval(() => {
-    blink = !blink;
-
-    if (currentStatus === "Fire Detected") {
-        statusContainer.style.backgroundColor = blink ? "#ff0000" : "#880000";
-        statusTextEl.style.color = "white";
-    } else {
-        statusContainer.style.backgroundColor = blink ? "#00cc00" : "#006600";
-        statusTextEl.style.color = "white";
-    }
-}, 500); // 500ms = 0.5s
-
-// Khi nhận được WebSocket message, chỉ cập nhật trạng thái hiện tại
-ws.onmessage = function (event) {
-    currentStatus = event.data;
-    console.log("Trạng thái nhận được:", currentStatus);
-    statusTextEl.textContent = currentStatus;
-};
-
 
 RotateUp();
 RotateDown();

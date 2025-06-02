@@ -1,4 +1,0 @@
-from google.colab import drive
-drive.mount('/content/drive')
-
-!cp -r /content/drive/MyDrive/data /content/
